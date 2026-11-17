@@ -15,6 +15,9 @@ import {
   AlertTriangle,
   X,
   BarChart3,
+  CheckCircle2,
+  AlertCircle,
+  Info,
 } from 'lucide-react';
 import { useAuth, calculateInitialTargets } from '../context/AuthContext';
 import { ConditionType, DietType, NutrientTargets, RestrictionType, TabType } from '../types';
@@ -28,12 +31,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigateTab }) => {
     user,
     profile,
     isAdmin,
+    emailVerified,
     loading: authLoading,
     updateProfileData,
     logout,
     resetPassword,
     deleteAccountAndData,
   } = useAuth();
+  const canAccessAdmin = Boolean(user && emailVerified && isAdmin);
 
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [dietType, setDietType] = useState<DietType>(profile?.dietType || 'veg');
@@ -179,6 +184,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigateTab }) => {
         <ChevronRight className="w-5 h-5 text-stone-800 dark:text-stone-200 shrink-0" />
       </button>
 
+      {/* About the data */}
+      <button
+        type="button"
+        onClick={() => onNavigateTab('about')}
+        className="w-full min-h-[48px] p-3.5 rounded-2xl bg-white dark:bg-stone-900 border-2 border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/70 text-left flex items-center justify-between gap-3 shadow-xs transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 flex items-center justify-center shrink-0">
+            <Info className="w-5 h-5" />
+          </div>
+          <span className="text-base font-bold text-stone-950 dark:text-white">
+            About the data
+          </span>
+        </div>
+        <ChevronRight className="w-5 h-5 text-stone-800 dark:text-stone-200 shrink-0" />
+      </button>
+
       {successMsg && (
         <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-emerald-800 dark:text-emerald-300 text-xs">
           {successMsg}
@@ -192,7 +214,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigateTab }) => {
       )}
 
       {/* Admin Quick Entry if Admin */}
-      {isAdmin && (
+      {canAccessAdmin && (
         <div className="p-4 rounded-2xl bg-emerald-900 text-white flex items-center justify-between shadow-md">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-700 flex items-center justify-center shrink-0">
@@ -234,9 +256,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigateTab }) => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">
-              Email Address
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
+                Email Address
+              </label>
+              <span
+                className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                  emailVerified
+                    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200'
+                    : 'bg-amber-100 text-amber-950 dark:bg-amber-950/60 dark:text-amber-200'
+                }`}
+              >
+                {emailVerified ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Email verified</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Not verified</span>
+                  </>
+                )}
+              </span>
+            </div>
             <input
               type="email"
               disabled

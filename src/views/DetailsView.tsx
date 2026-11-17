@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FoodItem, RatingRule, RatingLevel } from '../types';
@@ -40,8 +41,9 @@ const TAB_BUCKETS: { id: TabBucketKey; label: string }[] = [
 
 const RATING_RANK: Record<RatingLevel, number> = {
   favorable: 0,
-  moderate: 1,
-  limit: 2,
+  unknown: 1,
+  moderate: 2,
+  limit: 3,
 };
 
 function matchesBucket(food: FoodItem, bucket: TopTab): boolean {
@@ -52,8 +54,8 @@ function matchesBucket(food: FoodItem, bucket: TopTab): boolean {
   return food.type !== 'meal' && food.type !== 'fruit' && food.type !== 'vegetable';
 }
 
-function getFoodNutrientValue(food: FoodItem, nutrient: string): number {
-  return getRuleNutrientValue(food, nutrient, 1) ?? 0;
+function getFoodNutrientValue(food: FoodItem, nutrient: string): number | undefined {
+  return getRuleNutrientValue(food, nutrient, 1);
 }
 
 function formatNutrientDisplayName(nutrient: string): string {
@@ -102,12 +104,12 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         const ev = foodEvalMap.get(f.id) || evaluateFood(f, conditions, ratingRules);
         if (ev.overallLevel === 'favorable') suitable++;
         else if (ev.overallLevel === 'moderate') moderate++;
-        else limit++;
+        else if (ev.overallLevel === 'limit') limit++;
       });
       return {
         id: bucket.id,
         label: bucket.label,
-        total: bucketFoods.length,
+        total: suitable + moderate + limit,
         suitable,
         moderate,
         limit,
@@ -173,15 +175,16 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     if (!activeKeyRule) return null;
     const scoped = foodsInTopTab.filter(f => !vegOnly || f.isVeg);
     const entries = scoped
-      .map(food => {
+      .flatMap(food => {
         const value = getFoodNutrientValue(food, activeKeyRule.nutrient);
+        if (value === undefined) return [];
         const level: RatingLevel =
           value >= activeKeyRule.limitAbove
             ? 'limit'
             : value >= activeKeyRule.moderateAbove
             ? 'moderate'
             : 'favorable';
-        return { food, value, level };
+        return [{ food, value, level }];
       })
       .sort((a, b) => b.value - a.value);
 
@@ -445,6 +448,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
                         <XCircle className="w-4 h-4 text-red-700 dark:text-red-300 shrink-0" />
                       ) : level === 'moderate' ? (
                         <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0" />
+                      ) : level === 'unknown' ? (
+                        <HelpCircle className="w-4 h-4 text-stone-500 dark:text-stone-400 shrink-0" />
                       ) : (
                         <CheckCircle2 className="w-4 h-4 text-emerald-800 dark:text-emerald-300 shrink-0" />
                       );
@@ -453,9 +458,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
                         ? 'text-red-900 dark:text-red-200'
                         : level === 'moderate'
                         ? 'text-amber-900 dark:text-amber-200'
+                        : level === 'unknown'
+                        ? 'text-stone-700 dark:text-stone-300'
                         : 'text-emerald-900 dark:text-emerald-200';
                     const label =
-                      level === 'limit' ? 'Limit' : level === 'moderate' ? 'Moderate' : 'Suitable';
+                      level === 'limit'
+                        ? 'Limit'
+                        : level === 'moderate'
+                        ? 'Moderate'
+                        : level === 'unknown'
+                        ? 'Not enough data'
+                        : 'Suitable';
 
                     return (
                       <span className={`inline-flex items-center gap-1 font-bold whitespace-nowrap ${textClass}`}>

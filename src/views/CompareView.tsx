@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Search, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle2, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
 import { FoodItem, RatingRule, ConditionType, TabType } from '../types';
 import { evaluateFood, formatConditionName } from '../lib/ratingEngine';
 import { formatServingText } from '../lib/sampleFoods';
@@ -289,7 +289,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                       {/* Food 1 Value */}
                       <div className="col-span-1.5 text-center font-mono">
                         <span className="font-bold text-stone-900 dark:text-stone-100">
-                          {val1 !== null ? `${val1} ${n.unit}` : 'Unknown'}
+                          {val1 !== null ? `${val1} ${n.unit}` : 'Not available'}
                         </span>
                         {is1Lower && (
                           <div className="mt-0.5">
@@ -303,7 +303,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                       {/* Food 2 Value */}
                       <div className="col-span-1.5 text-center font-mono">
                         <span className="font-bold text-stone-900 dark:text-stone-100">
-                          {val2 !== null ? `${val2} ${n.unit}` : 'Unknown'}
+                          {val2 !== null ? `${val2} ${n.unit}` : 'Not available'}
                         </span>
                         {is2Lower && (
                           <div className="mt-0.5">
@@ -363,6 +363,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                                   ? 'bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200'
                                   : cEv1?.level === 'moderate'
                                   ? 'bg-amber-100 text-amber-950 dark:bg-amber-950/60 dark:text-amber-200'
+                                  : cEv1?.level === 'unknown'
+                                  ? 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200'
                                   : 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950/60 dark:text-emerald-200'
                               }`}
                             >
@@ -370,6 +372,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                                 <XCircle className="w-3.5 h-3.5 shrink-0" />
                               ) : cEv1?.level === 'moderate' ? (
                                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              ) : cEv1?.level === 'unknown' ? (
+                                <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
                               ) : (
                                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                               )}
@@ -378,6 +382,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                                   ? 'Limit'
                                   : cEv1?.level === 'moderate'
                                   ? 'Moderate'
+                                  : cEv1?.level === 'unknown'
+                                  ? 'Not enough data'
                                   : 'Suitable'}
                               </span>
                             </span>
@@ -399,6 +405,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                                   ? 'bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200'
                                   : cEv2?.level === 'moderate'
                                   ? 'bg-amber-100 text-amber-950 dark:bg-amber-950/60 dark:text-amber-200'
+                                  : cEv2?.level === 'unknown'
+                                  ? 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200'
                                   : 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950/60 dark:text-emerald-200'
                               }`}
                             >
@@ -406,6 +414,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                                 <XCircle className="w-3.5 h-3.5 shrink-0" />
                               ) : cEv2?.level === 'moderate' ? (
                                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              ) : cEv2?.level === 'unknown' ? (
+                                <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
                               ) : (
                                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                               )}
@@ -414,6 +424,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                                   ? 'Limit'
                                   : cEv2?.level === 'moderate'
                                   ? 'Moderate'
+                                  : cEv2?.level === 'unknown'
+                                  ? 'Not enough data'
                                   : 'Suitable'}
                               </span>
                             </span>

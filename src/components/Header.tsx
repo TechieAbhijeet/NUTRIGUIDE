@@ -10,7 +10,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenProfile, onOpenAdmin, activeTab }) => {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, emailVerified } = useAuth();
+  const canAccessAdmin = Boolean(user && emailVerified && isAdmin);
 
   return (
     <header className="sticky top-0 z-30 bg-white dark:bg-stone-900 border-b-2 border-stone-200 dark:border-stone-800 transition-colors">
@@ -28,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenProfile, onOpenAdmin, acti
         </div>
 
         <div className="flex items-center gap-2">
-          {isAdmin && (
+          {canAccessAdmin && (
             <button
               type="button"
               onClick={onOpenAdmin}

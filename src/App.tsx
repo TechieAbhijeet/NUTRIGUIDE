@@ -12,6 +12,7 @@ import { db } from './lib/firebase';
 import { handleFirestoreError, OperationType } from './lib/firestoreErrors';
 import { DEFAULT_DRAFT_RATING_RULES, SAMPLE_INDIAN_FOODS } from './lib/sampleFoods';
 import { getTodayLocalDate, formatLocalTimestamp } from './lib/dateUtils';
+import { stopHindiSpeech } from './lib/hindiAudio';
 import {
   FoodItem,
   RatingRule,
@@ -28,6 +29,7 @@ import { LandingPage } from './components/LandingPage';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { FoodDetailModal } from './components/FoodDetailModal';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
+import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { HomeView } from './views/HomeView';
@@ -40,9 +42,11 @@ import { CompareView } from './views/CompareView';
 import { MealView } from './views/MealView';
 import { CanIEatView } from './views/CanIEatView';
 import { DetailsView } from './views/DetailsView';
+import { AboutDataView } from './views/AboutDataView';
 
 function AppContent() {
-  const { user, profile, loading: authLoading, isAdmin } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, emailVerified } = useAuth();
+  const canAccessAdmin = Boolean(user && emailVerified && isAdmin);
 
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [foods, setFoods] = useState<FoodItem[]>([]);
@@ -76,18 +80,32 @@ function AppContent() {
   // Handle /admin and /details routes
   useEffect(() => {
     const checkRoute = () => {
-      if (
+      const isAdminRoute =
         window.location.pathname === '/admin' ||
         window.location.hash === '#admin' ||
-        window.location.hash === '#/admin'
-      ) {
-        setActiveTab('admin');
+        window.location.hash === '#/admin';
+
+      if (isAdminRoute) {
+        if (authLoading) return;
+        if (canAccessAdmin) {
+          setActiveTab('admin');
+        } else {
+          setActiveTab('home');
+          window.history.replaceState(null, '', '/');
+        }
       } else if (
         window.location.pathname === '/details' ||
         window.location.hash === '#details' ||
         window.location.hash === '#/details'
       ) {
         setActiveTab('details');
+      } else if (
+        window.location.pathname === '/about-data' ||
+        window.location.pathname === '/about' ||
+        window.location.hash === '#about-data' ||
+        window.location.hash === '#/about-data'
+      ) {
+        setActiveTab('about');
       }
     };
     checkRoute();
@@ -97,19 +115,55 @@ function AppContent() {
       window.removeEventListener('popstate', checkRoute);
       window.removeEventListener('hashchange', checkRoute);
     };
-  }, []);
+  }, [authLoading, canAccessAdmin]);
+
+  useEffect(() => {
+    if (!authLoading && activeTab === 'admin' && !canAccessAdmin) {
+      setActiveTab('home');
+      if (
+        window.location.pathname === '/admin' ||
+        window.location.hash === '#admin' ||
+        window.location.hash === '#/admin'
+      ) {
+        window.history.replaceState(null, '', '/');
+      }
+    }
+  }, [authLoading, activeTab, canAccessAdmin]);
 
   const navigateToTab = (tab: TabType, preserveSearch = false) => {
+    stopHindiSpeech();
+    if (tab === 'admin' && !canAccessAdmin) return;
     if (tab === 'check' && !preserveSearch) setSearchQueryForCheck('');
     setActiveTab(tab);
     if (tab === 'details') {
       if (window.location.pathname !== '/details') {
         window.history.pushState(null, '', '/details');
       }
-    } else if (window.location.pathname === '/details') {
+    } else if (tab === 'about') {
+      if (window.location.pathname !== '/about-data') {
+        window.history.pushState(null, '', '/about-data');
+      }
+    } else if (tab === 'admin') {
+      if (window.location.pathname !== '/admin') {
+        window.history.pushState(null, '', '/admin');
+      }
+    } else if (
+      window.location.pathname === '/details' ||
+      window.location.pathname === '/about-data' ||
+      window.location.pathname === '/about' ||
+      window.location.pathname === '/admin'
+    ) {
       window.history.pushState(null, '', '/');
     }
   };
+
+  useEffect(() => {
+    stopHindiSpeech();
+  }, [activeTab]);
+
+  useEffect(() => {
+    return () => stopHindiSpeech();
+  }, []);
 
   // 1. Fetch public foods & ratingRules (everybody reads)
   const fetchFoodsAndRules = async () => {
@@ -357,9 +411,10 @@ function AppContent() {
       {/* Top Header with Disclaimer */}
       <Header
         activeTab={activeTab}
-        onOpenProfile={() => setActiveTab('profile')}
-        onOpenAdmin={() => setActiveTab('admin')}
+        onOpenProfile={() => navigateToTab('profile')}
+        onOpenAdmin={() => navigateToTab('admin')}
       />
+      <EmailVerificationBanner />
 
       {/* Main Tab View */}
       <main className="flex-1">
@@ -461,7 +516,11 @@ function AppContent() {
             />
           )}
 
-          {activeTab === 'admin' && (
+          {activeTab === 'about' && (
+            <AboutDataView onBackToProfile={() => navigateToTab('profile')} />
+          )}
+
+          {activeTab === 'admin' && canAccessAdmin && (
             <AdminView
               currentFoods={foods}
               currentRules={ratingRules}

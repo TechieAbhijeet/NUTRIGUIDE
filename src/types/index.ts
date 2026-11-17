@@ -2,7 +2,7 @@ export type ConditionType = 'diabetes' | 'hypertension' | 'ckd';
 
 export type DietType = 'veg' | 'egg' | 'non-veg';
 
-export type TabType = 'home' | 'foods' | 'plan' | 'saved' | 'profile' | 'admin' | 'compare' | 'meal' | 'check' | 'details';
+export type TabType = 'home' | 'foods' | 'plan' | 'saved' | 'profile' | 'admin' | 'compare' | 'meal' | 'check' | 'details' | 'about';
 
 export type RestrictionType = 'sodium' | 'potassium' | 'phosphorus' | 'added_sugar' | 'fluid';
 
@@ -32,6 +32,7 @@ export type FoodType = 'meal' | 'fruit' | 'vegetable' | 'grain' | 'pulse' | 'dai
 export interface FoodItem {
   id: string;
   name: string;
+  aliases?: string[] | string;
   category: string;
   type?: FoodType;
   icon?: string;
@@ -65,18 +66,20 @@ export interface RatingRule {
   approvedDate?: string;
 }
 
-export type RatingLevel = 'favorable' | 'moderate' | 'limit';
+export type RatingLevel = 'favorable' | 'moderate' | 'limit' | 'unknown';
 
 export interface ConditionEvaluation {
   condition: ConditionType;
   level: RatingLevel;
   reasons: string[];
+  missingNutrients?: string[];
   hasDraftGuidance?: boolean;
 }
 
 export interface FoodEvaluation {
   overallLevel: RatingLevel;
   evaluations: ConditionEvaluation[];
+  missingNutrients?: string[];
   hasDraftGuidance?: boolean;
 }
 
@@ -93,7 +96,7 @@ export interface PlannedFoodItem {
   protein: number;
   sodium: number;
   potassium: number;
-  fiber: number;
+  fiber: number | null;
   isVeg: boolean;
 }
 

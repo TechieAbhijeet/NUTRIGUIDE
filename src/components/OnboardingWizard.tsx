@@ -3,6 +3,7 @@ import { Check, HeartPulse, Activity, ShieldAlert, ArrowRight, ArrowLeft } from 
 import { useAuth, calculateInitialTargets } from '../context/AuthContext';
 import { ConditionType, DietType, RestrictionType, NutrientTargets } from '../types';
 import { DisclaimerBanner } from './DisclaimerBanner';
+import { EmailVerificationBanner } from './EmailVerificationBanner';
 
 export const OnboardingWizard: React.FC = () => {
   const { saveOnboarding } = useAuth();
@@ -63,7 +64,10 @@ export const OnboardingWizard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-stone-950 flex flex-col justify-between">
-      <DisclaimerBanner />
+      <div>
+        <DisclaimerBanner />
+        <EmailVerificationBanner />
+      </div>
 
       <div className="flex-1 max-w-lg mx-auto w-full px-4 py-8 flex flex-col justify-center">
         {/* Step progress pills */}

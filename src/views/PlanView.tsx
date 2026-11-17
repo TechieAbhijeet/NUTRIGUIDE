@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { collection, doc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -142,9 +143,27 @@ export const PlanView: React.FC<PlanViewProps> = ({
   const totalProtein = allItems.reduce((acc, it) => acc + (Number(it?.protein) || 0), 0);
   const totalSodium = allItems.reduce((acc, it) => acc + (Number(it?.sodium) || 0), 0);
   const totalPotassium = allItems.reduce((acc, it) => acc + (Number(it?.potassium) || 0), 0);
-  const totalFiber = allItems.reduce((acc, it) => acc + (Number(it?.fiber) || 0), 0);
+  const totalFiber = allItems.reduce((acc, it) => acc + (typeof it?.fiber === 'number' ? it.fiber : 0), 0);
 
-  // Suitable foods for user conditions & diet type
+  const foodLookup = useMemo(() => {
+    const map = new Map<string, FoodItem>();
+    foods.forEach(f => map.set(f.id, f));
+    return map;
+  }, [foods]);
+
+  const hasUnknownTrackedNutrient = (
+    nutrient: 'carbs' | 'protein' | 'sodium' | 'potassium' | 'fiber'
+  ) =>
+    allItems.some(it => {
+      if (it?.[nutrient] === null || it?.[nutrient] === undefined) return true;
+      const liveFood = foodLookup.get(it.foodId);
+      if (liveFood && (liveFood[nutrient] === null || liveFood[nutrient] === undefined)) {
+        return true;
+      }
+      return false;
+    });
+
+  // Suitable foods for user conditions & diet type (excludes unknown)
   const suitableFoods = useMemo(() => {
     const conditions = profile?.conditions || [];
     const isVeg = profile?.dietType === 'veg';
@@ -167,7 +186,10 @@ export const PlanView: React.FC<PlanViewProps> = ({
     protein: Math.round(food.protein * quantity * 10) / 10,
     sodium: Math.round(food.sodium * quantity),
     potassium: Math.round(food.potassium * quantity),
-    fiber: Math.round((food.fiber ?? 0) * quantity * 10) / 10,
+    fiber:
+      food.fiber !== null && food.fiber !== undefined
+        ? Math.round(food.fiber * quantity * 10) / 10
+        : null,
     isVeg: food.isVeg,
   });
 
@@ -350,7 +372,10 @@ export const PlanView: React.FC<PlanViewProps> = ({
       protein: Math.round(item.protein * ratio * 10) / 10,
       sodium: Math.round(item.sodium * ratio),
       potassium: Math.round(item.potassium * ratio),
-      fiber: Math.round(item.fiber * ratio * 10) / 10,
+      fiber:
+        typeof item.fiber === 'number'
+          ? Math.round(item.fiber * ratio * 10) / 10
+          : null,
     };
 
     const updatedSlot = [...currentSlotItems];
@@ -747,8 +772,11 @@ export const PlanView: React.FC<PlanViewProps> = ({
       servingGrams: item.servingGrams,
       kcal: Math.round(item.kcal / mult),
       carbs: Math.round((item.carbs / mult) * 10) / 10,
-      sugars: 0,
-      fiber: Math.round((item.fiber / mult) * 10) / 10,
+      sugars: null,
+      fiber:
+        typeof item.fiber === 'number'
+          ? Math.round((item.fiber / mult) * 10) / 10
+          : null,
       protein: Math.round((item.protein / mult) * 10) / 10,
       sodium: Math.round(item.sodium / mult),
       potassium: Math.round(item.potassium / mult),
@@ -1065,6 +1093,11 @@ export const PlanView: React.FC<PlanViewProps> = ({
                   style={{ width: `${Math.min(100, (totalCarbs / Math.max(targets.carbs, 1)) * 100)}%` }}
                 />
               </div>
+              {hasUnknownTrackedNutrient('carbs') && (
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium mt-1">
+                  some values unknown
+                </p>
+              )}
             </div>
 
             {/* Sodium */}
@@ -1083,6 +1116,11 @@ export const PlanView: React.FC<PlanViewProps> = ({
                   style={{ width: `${Math.min(100, (totalSodium / Math.max(targets.sodium, 1)) * 100)}%` }}
                 />
               </div>
+              {hasUnknownTrackedNutrient('sodium') && (
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium mt-1">
+                  some values unknown
+                </p>
+              )}
             </div>
 
             {/* Potassium */}
@@ -1101,6 +1139,11 @@ export const PlanView: React.FC<PlanViewProps> = ({
                   style={{ width: `${Math.min(100, (totalPotassium / Math.max(targets.potassium, 1)) * 100)}%` }}
                 />
               </div>
+              {hasUnknownTrackedNutrient('potassium') && (
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium mt-1">
+                  some values unknown
+                </p>
+              )}
             </div>
 
             {/* Protein & Fiber row */}
@@ -1110,12 +1153,22 @@ export const PlanView: React.FC<PlanViewProps> = ({
                 <p className="font-bold font-mono text-stone-900 dark:text-stone-100 mt-0.5">
                   {Math.round(totalProtein)}g <span className="font-normal text-stone-500">/ {targets.protein}g</span>
                 </p>
+                {hasUnknownTrackedNutrient('protein') && (
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium mt-1">
+                    some values unknown
+                  </p>
+                )}
               </div>
               <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-800 text-xs">
                 <span className="text-[10px] text-stone-500 font-medium">Dietary Fiber</span>
                 <p className="font-bold font-mono text-stone-900 dark:text-stone-100 mt-0.5">
                   {Math.round(totalFiber)}g <span className="font-normal text-stone-500">/ {targets.fiber}g</span>
                 </p>
+                {hasUnknownTrackedNutrient('fiber') && (
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium mt-1">
+                    some values unknown
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1554,6 +1607,7 @@ export const PlanView: React.FC<PlanViewProps> = ({
                   const ev = evaluateFood(food, profile?.conditions || [], ratingRules);
                   const isFav = ev.overallLevel === 'favorable';
                   const isMod = ev.overallLevel === 'moderate';
+                  const isUnk = ev.overallLevel === 'unknown';
 
                   return (
                     <button
@@ -1590,6 +1644,8 @@ export const PlanView: React.FC<PlanViewProps> = ({
                             ? 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200'
                             : isMod
                             ? 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200'
+                            : isUnk
+                            ? 'bg-stone-200 text-stone-800 dark:bg-stone-700 dark:text-stone-200'
                             : 'bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-200'
                         }`}
                       >
@@ -1597,6 +1653,8 @@ export const PlanView: React.FC<PlanViewProps> = ({
                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         ) : isMod ? (
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        ) : isUnk ? (
+                          <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
                         ) : (
                           <XCircle className="w-3.5 h-3.5 shrink-0" />
                         )}

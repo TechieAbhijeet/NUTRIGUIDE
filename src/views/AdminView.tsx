@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { collection, deleteDoc, doc, getDocs, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -27,7 +28,7 @@ import {
   SAMPLE_INDIAN_FOODS,
   normalizeFoodType,
 } from '../lib/sampleFoods';
-import { evaluateFood, formatConditionName } from '../lib/ratingEngine';
+import { evaluateFood, formatConditionName, getRuleNutrientValue } from '../lib/ratingEngine';
 import { handleFirestoreError, OperationType } from '../lib/firestoreErrors';
 import { getTodayLocalDate } from '../lib/dateUtils';
 
@@ -74,6 +75,7 @@ interface RuleImpactSummary {
   suitable: number;
   moderate: number;
   limit: number;
+  unknown: number;
   total: number;
   conditions: ConditionType[];
 }
@@ -448,7 +450,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   currentFoods,
   onRefreshData,
 }) => {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, emailVerified } = useAuth();
 
   const [dbFoods, setDbFoods] = useState<AdminFoodDoc[]>([]);
   const [loadingDbFoods, setLoadingDbFoods] = useState(false);
@@ -465,6 +467,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
 
   const [tableSearch, setTableSearch] = useState('');
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditableFoodForm | null>(null);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
@@ -613,10 +616,38 @@ export const AdminView: React.FC<AdminViewProps> = ({
     }
   }, [availableFoodNumericFields, addRuleForm.nutrient]);
 
+  const foodHasMissingData = (food: AdminFoodDoc): boolean => {
+    for (const field of NUMERIC_FOOD_FIELDS) {
+      const val: unknown = food[field];
+      if (
+        val === null ||
+        val === undefined ||
+        val === '' ||
+        (typeof val === 'number' && !Number.isFinite(val))
+      ) {
+        return true;
+      }
+    }
+    for (const rule of dbRules) {
+      if (getRuleNutrientValue(food as FoodItem, rule.nutrient, 1) === undefined) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const missingDataFoodsCount = useMemo(
+    () => dbFoods.filter(food => foodHasMissingData(food)).length,
+    [dbFoods, dbRules]
+  );
+
   const filteredFoods = useMemo(() => {
     const q = tableSearch.trim().toLowerCase();
-    if (!q) return dbFoods;
     return dbFoods.filter(food => {
+      if (showMissingOnly && !foodHasMissingData(food)) {
+        return false;
+      }
+      if (!q) return true;
       const fields = [
         food.id,
         food.name,
@@ -630,9 +661,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
       ];
       return fields.some(v => String(v ?? '').toLowerCase().includes(q));
     });
-  }, [dbFoods, tableSearch, extraColumns]);
+  }, [dbFoods, dbRules, tableSearch, showMissingOnly, extraColumns]);
 
-  if (!isAdmin || !user) {
+  if (!isAdmin || !user || !emailVerified) {
     return (
       <div className="pb-24 max-w-lg mx-auto px-4 pt-12 text-center">
         <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 mx-auto flex items-center justify-center mb-4">
@@ -1077,11 +1108,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
     let suitable = 0;
     let moderate = 0;
     let limit = 0;
+    let unknown = 0;
 
     for (const food of foodsToEval) {
       const ev = evaluateFood(food, userConds, nextRules);
       if (ev.overallLevel === 'favorable') suitable++;
       else if (ev.overallLevel === 'moderate') moderate++;
+      else if (ev.overallLevel === 'unknown') unknown++;
       else limit++;
     }
 
@@ -1089,6 +1122,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       suitable,
       moderate,
       limit,
+      unknown,
       total: foodsToEval.length,
       conditions: userConds,
     });
@@ -1616,6 +1650,20 @@ Papaya,Fruits,fruit,🍈,1 small bowl (120g),120,50,12.0,8.5,2.2,0.6,5,215,12,tr
 
             <button
               type="button"
+              onClick={() => setShowMissingOnly(prev => !prev)}
+              aria-pressed={showMissingOnly}
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${
+                showMissingOnly
+                  ? 'bg-amber-700 text-white border-amber-700'
+                  : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/70 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
+              }`}
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>Missing data ({missingDataFoodsCount})</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 setShowDeleteAllConfirm(prev => !prev);
                 setDeleteAllInput('');
@@ -1872,11 +1920,16 @@ Papaya,Fruits,fruit,🍈,1 small bowl (120g),120,50,12.0,8.5,2.2,0.6,5,215,12,tr
                 filteredFoods.map(food => {
                   const isEditing = editingId === food.id && editForm !== null;
                   const isConfirmingDelete = confirmDeleteId === food.id;
+                  const rowHasMissing = foodHasMissingData(food);
 
                   return (
                     <tr
                       key={food.id}
-                      className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors"
+                      className={`transition-colors ${
+                        rowHasMissing
+                          ? 'bg-amber-50/80 dark:bg-amber-950/30 hover:bg-amber-100/80 dark:hover:bg-amber-950/45 border-l-4 border-l-amber-500'
+                          : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'
+                      }`}
                     >
                       <td className="p-2 whitespace-nowrap">
                         {isEditing ? (
@@ -1947,7 +2000,13 @@ Papaya,Fruits,fruit,🍈,1 small bowl (120g),120,50,12.0,8.5,2.2,0.6,5,215,12,tr
                       </td>
 
                       <td className="p-2 font-mono text-[11px] text-stone-600 dark:text-stone-400 whitespace-nowrap">
-                        {food.id}
+                        <span>{food.id}</span>
+                        {rowHasMissing && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900/70 text-amber-950 dark:text-amber-100 font-sans text-[10px] font-bold">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            <span>Missing</span>
+                          </span>
+                        )}
                       </td>
 
                       {isEditing && editForm ? (
@@ -2249,6 +2308,12 @@ Papaya,Fruits,fruit,🍈,1 small bowl (120g),120,50,12.0,8.5,2.2,0.6,5,215,12,tr
                 <XCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>Limit: {ruleImpactSummary.limit}</span>
               </span>
+              {ruleImpactSummary.unknown > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-200">
+                  <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Not enough data: {ruleImpactSummary.unknown}</span>
+                </span>
+              )}
             </div>
           </div>
         )}

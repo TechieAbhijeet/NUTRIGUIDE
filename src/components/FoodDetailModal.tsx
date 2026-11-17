@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { X, Bookmark, BookmarkCheck, Plus, Check, ArrowLeftRight, ChevronRight, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
+import { X, Bookmark, BookmarkCheck, Plus, Check, ArrowLeftRight, ChevronRight, CheckCircle2, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
 import { FoodItem, RatingRule, ConditionType, MealSlotType, PlannedFoodItem } from '../types';
 import { evaluateFood, formatConditionName } from '../lib/ratingEngine';
 import { formatServingText, getFoodIcon } from '../lib/sampleFoods';
+import { stopHindiSpeech } from '../lib/hindiAudio';
+import { HindiAudioButton } from './HindiAudioButton';
 
 interface FoodDetailModalProps {
   food: FoodItem | null;
@@ -41,10 +43,11 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
     favorable: 3,
     moderate: 2,
     limit: 1,
+    unknown: 1,
   };
   const currentRank = rankMap[evaluation.overallLevel] || 1;
 
-  // Better alternatives in same category with higher overall rating for user's conditions (max 3)
+  // Better alternatives in same category with higher overall rating for user's conditions (max 3), excluding unknown
   const betterAlternatives = (allFoods || [])
     .filter(
       f =>
@@ -56,7 +59,12 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
       const altRank = rankMap[altEval.overallLevel] || 1;
       return { food: altFood, evaluation: altEval, rank: altRank };
     })
-    .filter(item => item.rank > currentRank)
+    .filter(
+      item =>
+        (item.evaluation.overallLevel === 'favorable' ||
+          item.evaluation.overallLevel === 'moderate') &&
+        item.rank > currentRank
+    )
     .sort((a, b) => b.rank - a.rank)
     .slice(0, 3);
 
@@ -72,7 +80,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
       protein: Math.round(food.protein * quantity * 10) / 10,
       sodium: Math.round(food.sodium * quantity),
       potassium: Math.round(food.potassium * quantity),
-      fiber: Math.round((food.fiber ?? 0) * quantity * 10) / 10,
+      fiber:
+        food.fiber !== null && food.fiber !== undefined
+          ? Math.round(food.fiber * quantity * 10) / 10
+          : null,
       isVeg: food.isVeg,
     };
 
@@ -99,11 +110,16 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
     return false;
   };
 
+  const handleCloseModal = () => {
+    stopHindiSpeech();
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
       onClick={e => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleCloseModal();
       }}
     >
       <div className="w-full max-w-lg bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto border border-stone-200 dark:border-stone-800 shadow-2xl flex flex-col">
@@ -149,7 +165,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
             {onCompare && (
               <button
                 type="button"
-                onClick={() => onCompare(food)}
+                onClick={() => {
+                  stopHindiSpeech();
+                  onCompare(food);
+                }}
                 className="min-h-[44px] px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-900 dark:hover:text-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-colors"
                 title="Compare with another food"
               >
@@ -169,7 +188,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
               )}
             </button>
             <button
-              onClick={onClose}
+              onClick={handleCloseModal}
               className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-stone-700 dark:text-stone-200 hover:text-stone-950 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
               aria-label="Close dialog"
             >
@@ -180,6 +199,13 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-5 space-y-5 flex-1">
+          {/* Hindi Audio Listen / Stop */}
+          <HindiAudioButton
+            food={food}
+            evaluation={evaluation}
+            ratingRules={ratingRules}
+          />
+
           {/* Condition Traffic Light Evaluations */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -202,6 +228,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                 {evaluation.evaluations.map(ev => {
                   const isLimit = ev.level === 'limit';
                   const isModerate = ev.level === 'moderate';
+                  const isUnknown = ev.level === 'unknown';
 
                   return (
                     <div
@@ -211,6 +238,8 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                           ? 'bg-red-50/70 border-red-200 dark:bg-red-950/30 dark:border-red-900/50'
                           : isModerate
                           ? 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50'
+                          : isUnknown
+                          ? 'bg-stone-100/80 border-stone-300 dark:bg-stone-800/70 dark:border-stone-700'
                           : 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50'
                       }`}
                     >
@@ -225,6 +254,8 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                                 ? 'bg-red-200 text-red-950 dark:bg-red-900 dark:text-red-100'
                                 : isModerate
                                 ? 'bg-amber-200 text-amber-950 dark:bg-amber-900 dark:text-amber-100'
+                                : isUnknown
+                                ? 'bg-stone-200 text-stone-900 dark:bg-stone-700 dark:text-stone-100'
                                 : 'bg-emerald-200 text-emerald-950 dark:bg-emerald-900 dark:text-emerald-100'
                             }`}
                           >
@@ -232,10 +263,20 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                               <XCircle className="w-3.5 h-3.5 shrink-0" />
                             ) : isModerate ? (
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            ) : isUnknown ? (
+                              <HelpCircle className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300 shrink-0" />
                             ) : (
                               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                             )}
-                            <span>{isLimit ? 'Limit / Caution' : isModerate ? 'Moderate Portion' : 'Suitable'}</span>
+                            <span>
+                              {isLimit
+                                ? 'Limit / Caution'
+                                : isModerate
+                                ? 'Moderate Portion'
+                                : isUnknown
+                                ? 'Not enough data'
+                                : 'Suitable'}
+                            </span>
                           </span>
                           {ev.hasDraftGuidance && (
                             <span className="text-xs font-semibold text-amber-900 dark:text-amber-300">
@@ -357,7 +398,13 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                   )}
                 </div>
                 <p className="text-base font-bold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
-                  {food.kcal} <span className="text-[10px] font-sans font-normal">kcal</span>
+                  {food.kcal !== null && food.kcal !== undefined ? (
+                    <>
+                      {food.kcal} <span className="text-[10px] font-sans font-normal">kcal</span>
+                    </>
+                  ) : (
+                    <span className="text-xs font-sans font-normal text-stone-500">Not available</span>
+                  )}
                 </p>
               </div>
 
@@ -372,7 +419,13 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                   )}
                 </div>
                 <p className="text-base font-bold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
-                  {food.carbs} <span className="text-[10px] font-sans font-normal">g</span>
+                  {food.carbs !== null && food.carbs !== undefined ? (
+                    <>
+                      {food.carbs} <span className="text-[10px] font-sans font-normal">g</span>
+                    </>
+                  ) : (
+                    <span className="text-xs font-sans font-normal text-stone-500">Not available</span>
+                  )}
                 </p>
               </div>
 
@@ -387,7 +440,13 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                   )}
                 </div>
                 <p className="text-base font-bold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
-                  {food.protein} <span className="text-[10px] font-sans font-normal">g</span>
+                  {food.protein !== null && food.protein !== undefined ? (
+                    <>
+                      {food.protein} <span className="text-[10px] font-sans font-normal">g</span>
+                    </>
+                  ) : (
+                    <span className="text-xs font-sans font-normal text-stone-500">Not available</span>
+                  )}
                 </p>
               </div>
 
@@ -407,7 +466,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                       {food.fiber} <span className="text-[10px] font-sans font-normal">g</span>
                     </>
                   ) : (
-                    <span className="text-xs font-sans font-normal text-stone-500">Unknown</span>
+                    <span className="text-xs font-sans font-normal text-stone-500">Not available</span>
                   )}
                 </p>
               </div>
@@ -423,7 +482,13 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                   )}
                 </div>
                 <p className="text-base font-bold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
-                  {food.sodium} <span className="text-[10px] font-sans font-normal">mg</span>
+                  {food.sodium !== null && food.sodium !== undefined ? (
+                    <>
+                      {food.sodium} <span className="text-[10px] font-sans font-normal">mg</span>
+                    </>
+                  ) : (
+                    <span className="text-xs font-sans font-normal text-stone-500">Not available</span>
+                  )}
                 </p>
               </div>
 
@@ -438,7 +503,13 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                   )}
                 </div>
                 <p className="text-base font-bold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
-                  {food.potassium} <span className="text-[10px] font-sans font-normal">mg</span>
+                  {food.potassium !== null && food.potassium !== undefined ? (
+                    <>
+                      {food.potassium} <span className="text-[10px] font-sans font-normal">mg</span>
+                    </>
+                  ) : (
+                    <span className="text-xs font-sans font-normal text-stone-500">Not available</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -447,7 +518,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
               <span className="flex items-center gap-1">
                 Sugars:{' '}
                 <strong className="font-mono">
-                  {food.sugars !== null && food.sugars !== undefined ? `${food.sugars}g` : 'Unknown'}
+                  {food.sugars !== null && food.sugars !== undefined ? `${food.sugars}g` : 'Not available'}
                 </strong>
                 {hasKeyRule('sugars') && (
                   <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -456,7 +527,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                 )}
               </span>
               <span className="flex items-center gap-1">
-                Phosphorus: <strong className="font-mono">{food.phosphorus}mg</strong>
+                Phosphorus:{' '}
+                <strong className="font-mono">
+                  {food.phosphorus !== null && food.phosphorus !== undefined ? `${food.phosphorus}mg` : 'Not available'}
+                </strong>
                 {hasKeyRule('phosphorus') && (
                   <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                     Key

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bookmark, BookmarkCheck, ChevronRight, Trash2, CalendarPlus, Check, AlertTriangle, RefreshCw, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronRight, Trash2, CalendarPlus, Check, AlertTriangle, RefreshCw, CheckCircle2, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FoodItem, RatingRule, SavedFoodItem, TabType, MealSlotType, PlannedFoodItem } from '../types';
 import { evaluateFood, formatConditionName, getPlainRatingLabel } from '../lib/ratingEngine';
@@ -51,7 +51,7 @@ export const SavedView: React.FC<SavedViewProps> = ({
       protein: food.protein,
       sodium: food.sodium,
       potassium: food.potassium,
-      fiber: food.fiber ?? 0,
+      fiber: food.fiber !== null && food.fiber !== undefined ? food.fiber : null,
       isVeg: food.isVeg,
     };
 
@@ -202,6 +202,8 @@ export const SavedView: React.FC<SavedViewProps> = ({
                                 ? 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200'
                                 : cEv.level === 'moderate'
                                 ? 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200'
+                                : cEv.level === 'unknown'
+                                ? 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200'
                                 : 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200'
                             }`}
                           >
@@ -209,6 +211,8 @@ export const SavedView: React.FC<SavedViewProps> = ({
                               <XCircle className="w-3.5 h-3.5 shrink-0" />
                             ) : cEv.level === 'moderate' ? (
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            ) : cEv.level === 'unknown' ? (
+                              <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
                             ) : (
                               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                             )}

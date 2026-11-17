@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -224,7 +225,7 @@ export const MealView: React.FC<MealViewProps> = ({
       protein: food.protein,
       sodium: food.sodium,
       potassium: food.potassium,
-      fiber: food.fiber ?? 0,
+      fiber: food.fiber !== null && food.fiber !== undefined ? food.fiber : null,
       isVeg: food.isVeg,
     }));
 
@@ -333,6 +334,7 @@ export const MealView: React.FC<MealViewProps> = ({
           const ev = food ? evaluateFood(food, conditions, ratingRules) : null;
           const isModerate = ev?.overallLevel === 'moderate';
           const isLimit = ev?.overallLevel === 'limit';
+          const isUnknown = ev?.overallLevel === 'unknown';
 
           return (
             <div
@@ -343,6 +345,8 @@ export const MealView: React.FC<MealViewProps> = ({
                     ? 'bg-red-50/50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50'
                     : isModerate
                     ? 'bg-amber-50/50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50'
+                    : isUnknown
+                    ? 'bg-stone-100/70 border-stone-300 dark:bg-stone-800/60 dark:border-stone-700'
                     : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 shadow-xs'
                   : 'bg-stone-50/70 dark:bg-stone-900/50 border-dashed border-stone-300 dark:border-stone-700'
               }`}
@@ -420,6 +424,8 @@ export const MealView: React.FC<MealViewProps> = ({
                             ? 'bg-red-200 text-red-950 dark:bg-red-900 dark:text-red-100'
                             : isModerate
                             ? 'bg-amber-200 text-amber-950 dark:bg-amber-900 dark:text-amber-100'
+                            : isUnknown
+                            ? 'bg-stone-200 text-stone-900 dark:bg-stone-700 dark:text-stone-100'
                             : 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200'
                         }`}
                       >
@@ -427,6 +433,8 @@ export const MealView: React.FC<MealViewProps> = ({
                           <XCircle className="w-3.5 h-3.5 shrink-0" />
                         ) : isModerate ? (
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        ) : isUnknown ? (
+                          <HelpCircle className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300 shrink-0" />
                         ) : (
                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         )}
@@ -440,24 +448,34 @@ export const MealView: React.FC<MealViewProps> = ({
                     </div>
                   )}
 
-                  {/* Note if item rates Moderate or Limit */}
-                  {(isModerate || isLimit) && ev && (
+                  {/* Note if item rates Moderate, Limit, or Unknown */}
+                  {(isModerate || isLimit || isUnknown) && ev && (
                     <div
                       className={`p-2.5 rounded-xl text-xs space-y-0.5 ${
                         isLimit
                           ? 'bg-red-100/70 text-red-900 dark:bg-red-950/40 dark:text-red-200 border border-red-200 dark:border-red-900'
-                          : 'bg-amber-100/70 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-200 dark:border-amber-900'
+                          : isModerate
+                          ? 'bg-amber-100/70 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-200 dark:border-amber-900'
+                          : 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200 border border-stone-300 dark:border-stone-700'
                       }`}
                     >
                       <p className="font-bold flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {isUnknown ? (
+                          <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        )}
                         <span>
-                          {isLimit ? 'Limit Alert for Conditions' : 'Moderate Intake Recommended'}
+                          {isLimit
+                            ? 'Limit Alert for Conditions'
+                            : isModerate
+                            ? 'Moderate Intake Recommended'
+                            : 'Not enough data'}
                         </span>
                       </p>
                       {ev.evaluations.map(
                         cEv =>
-                          (cEv.level === 'moderate' || cEv.level === 'limit') && (
+                          (cEv.level === 'moderate' || cEv.level === 'limit' || cEv.level === 'unknown') && (
                             <p key={cEv.condition} className="text-[11px] leading-tight">
                               • <strong>{formatConditionName(cEv.condition)}:</strong> {cEv.reasons.join(', ')}
                             </p>
@@ -653,6 +671,7 @@ export const MealView: React.FC<MealViewProps> = ({
                   const ev = evaluateFood(food, conditions, ratingRules);
                   const isFav = ev.overallLevel === 'favorable';
                   const isMod = ev.overallLevel === 'moderate';
+                  const isUnk = ev.overallLevel === 'unknown';
 
                   return (
                     <button
@@ -689,6 +708,8 @@ export const MealView: React.FC<MealViewProps> = ({
                             ? 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200'
                             : isMod
                             ? 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200'
+                            : isUnk
+                            ? 'bg-stone-200 text-stone-800 dark:bg-stone-700 dark:text-stone-200'
                             : 'bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-200'
                         }`}
                       >
@@ -696,6 +717,8 @@ export const MealView: React.FC<MealViewProps> = ({
                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         ) : isMod ? (
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        ) : isUnk ? (
+                          <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
                         ) : (
                           <XCircle className="w-3.5 h-3.5 shrink-0" />
                         )}

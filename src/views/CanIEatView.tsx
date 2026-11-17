@@ -9,13 +9,16 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { FoodItem, RatingRule, SavedFoodItem } from '../types';
-import { evaluateFood, getPlainRatingLabel } from '../lib/ratingEngine';
+import { evaluateFood, getPlainMainReason, getPlainRatingLabel } from '../lib/ratingEngine';
 import { formatServingText } from '../lib/sampleFoods';
+import { stopHindiSpeech } from '../lib/hindiAudio';
+import { HindiAudioButton } from '../components/HindiAudioButton';
 
 interface CanIEatViewProps {
   foods: FoodItem[];
@@ -90,6 +93,7 @@ export const CanIEatView: React.FC<CanIEatViewProps> = ({
   };
 
   const handleOpenFood = (food: FoodItem) => {
+    stopHindiSpeech();
     if (trimmedQuery) {
       saveSearchTerm(trimmedQuery);
     }
@@ -203,49 +207,71 @@ export const CanIEatView: React.FC<CanIEatViewProps> = ({
                   const level = ev.overallLevel;
                   const overallIsLimit = level === 'limit';
                   const overallIsMod = level === 'moderate';
+                  const overallIsUnknown = level === 'unknown';
 
                   return (
-                    <button
+                    <div
                       key={food.id}
-                      type="button"
-                      onClick={() => handleOpenFood(food)}
-                      className="w-full min-h-[48px] p-3.5 rounded-2xl bg-white dark:bg-stone-900 border-2 border-stone-300 dark:border-stone-700 hover:border-emerald-800 transition-all text-left shadow-xs flex items-center justify-between gap-3 active:scale-[0.99]"
+                      className="rounded-2xl bg-white dark:bg-stone-900 border-2 border-stone-300 dark:border-stone-700 hover:border-emerald-800 transition-all shadow-xs p-3.5 space-y-3"
                     >
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <h2 className="text-base font-extrabold text-stone-950 dark:text-white leading-snug">
-                          {food.name}
-                        </h2>
-                        <p className="text-sm text-stone-700 dark:text-stone-300">
-                          Serving: {formatServingText(food.servingLabel, food.servingGrams)}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          {overallIsLimit ? (
-                            <XCircle className="w-4 h-4 text-red-700 dark:text-red-300 shrink-0" />
-                          ) : overallIsMod ? (
-                            <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0" />
-                          ) : (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-800 dark:text-emerald-300 shrink-0" />
-                          )}
-                          <span
-                            className={`text-sm font-bold ${
-                              overallIsLimit
-                                ? 'text-red-900 dark:text-red-200'
-                                : overallIsMod
-                                ? 'text-amber-900 dark:text-amber-200'
-                                : 'text-emerald-900 dark:text-emerald-200'
-                            }`}
-                          >
-                            {getPlainRatingLabel(level)}
-                          </span>
-                          {ev.hasDraftGuidance && (
-                            <span className="text-xs font-semibold text-amber-900 dark:text-amber-300">
-                              · Draft guidance
+                      <button
+                        type="button"
+                        onClick={() => handleOpenFood(food)}
+                        className="w-full min-h-[48px] text-left flex items-center justify-between gap-3 active:scale-[0.99]"
+                      >
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <h2 className="text-base font-extrabold text-stone-950 dark:text-white leading-snug">
+                            {food.name}
+                          </h2>
+                          <p className="text-sm text-stone-700 dark:text-stone-300">
+                            Serving: {formatServingText(food.servingLabel, food.servingGrams)}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            {overallIsLimit ? (
+                              <XCircle className="w-4 h-4 text-red-700 dark:text-red-300 shrink-0" />
+                            ) : overallIsMod ? (
+                              <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0" />
+                            ) : overallIsUnknown ? (
+                              <HelpCircle className="w-4 h-4 text-stone-500 dark:text-stone-400 shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-800 dark:text-emerald-300 shrink-0" />
+                            )}
+                            <span
+                              className={`text-sm font-bold ${
+                                overallIsLimit
+                                  ? 'text-red-900 dark:text-red-200'
+                                  : overallIsMod
+                                  ? 'text-amber-900 dark:text-amber-200'
+                                  : overallIsUnknown
+                                  ? 'text-stone-700 dark:text-stone-300'
+                                  : 'text-emerald-900 dark:text-emerald-200'
+                              }`}
+                            >
+                              {getPlainRatingLabel(level)}
                             </span>
+                            {ev.hasDraftGuidance && (
+                              <span className="text-xs font-semibold text-amber-900 dark:text-amber-300">
+                                · Draft guidance
+                              </span>
+                            )}
+                          </div>
+                          {overallIsUnknown && (
+                            <p className="text-xs text-stone-600 dark:text-stone-400">
+                              {getPlainMainReason(food, ev, ratingRules)}
+                            </p>
                           )}
                         </div>
+                        <ChevronRight className="w-5 h-5 text-stone-700 dark:text-stone-300 shrink-0" />
+                      </button>
+
+                      <div className="pt-2 border-t border-stone-200 dark:border-stone-800">
+                        <HindiAudioButton
+                          food={food}
+                          evaluation={ev}
+                          ratingRules={ratingRules}
+                        />
                       </div>
-                      <ChevronRight className="w-5 h-5 text-stone-700 dark:text-stone-300 shrink-0" />
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -258,7 +284,10 @@ export const CanIEatView: React.FC<CanIEatViewProps> = ({
       <div className="pt-6 pb-2">
         <button
           type="button"
-          onClick={onOpenWhatCanIEat}
+          onClick={() => {
+            stopHindiSpeech();
+            onOpenWhatCanIEat();
+          }}
           className="min-h-[46px] w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-stone-900 border-2 border-emerald-700 text-emerald-950 dark:text-emerald-200 text-sm font-bold inline-flex items-center justify-center gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
         >
           <span>Not sure what to eat? See good choices</span>

@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
   deleteUser,
   reauthenticateWithCredential,
@@ -31,11 +32,14 @@ interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   isAdmin: boolean;
+  emailVerified: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
+  refreshVerificationStatus: () => Promise<boolean>;
   logout: () => Promise<void>;
   saveOnboarding: (data: {
     conditions: ConditionType[];
@@ -91,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const checkAdminStatus = async (currentUser: FirebaseUser | null): Promise<boolean> => {
@@ -105,12 +110,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshVerificationStatus = async (): Promise<boolean> => {
+    if (!auth.currentUser) {
+      setEmailVerified(false);
+      setIsAdmin(false);
+      return false;
+    }
+    await auth.currentUser.reload();
+    await auth.currentUser.getIdToken(true);
+    const verified = Boolean(auth.currentUser.emailVerified);
+    setEmailVerified(verified);
+    setUser(auth.currentUser);
+    const adminState = await checkAdminStatus(auth.currentUser);
+    setIsAdmin(adminState);
+    return verified;
+  };
+
   const refreshAdminStatus = async () => {
     if (auth.currentUser) {
       await auth.currentUser.reload();
+      await auth.currentUser.getIdToken(true);
+      setEmailVerified(Boolean(auth.currentUser.emailVerified));
       const adminState = await checkAdminStatus(auth.currentUser);
       setIsAdmin(adminState);
     } else {
+      setEmailVerified(false);
       setIsAdmin(false);
     }
   };
@@ -151,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async currentUser => {
       setUser(currentUser);
+      setEmailVerified(Boolean(currentUser?.emailVerified));
       if (currentUser) {
         const isUserAdmin = await checkAdminStatus(currentUser);
         setIsAdmin(isUserAdmin);
@@ -175,8 +200,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const registerWithEmail = async (email: string, pass: string, name: string) => {
     const res = await createUserWithEmailAndPassword(auth, email, pass);
-    if (res.user && name) {
-      await updateProfile(res.user, { displayName: name });
+    if (res.user) {
+      if (name) {
+        await updateProfile(res.user, { displayName: name });
+      }
+      await sendEmailVerification(res.user);
     }
   };
 
@@ -184,8 +212,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await sendPasswordResetEmail(auth, email);
   };
 
+  const resendVerificationEmail = async () => {
+    if (!auth.currentUser) throw new Error('Not authenticated');
+    await sendEmailVerification(auth.currentUser);
+  };
+
   const logout = async () => {
     await signOut(auth);
+    setEmailVerified(false);
     setIsAdmin(false);
     setProfile(null);
   };
@@ -292,11 +326,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         isAdmin,
+        emailVerified,
         loading,
         signInWithGoogle,
         loginWithEmail,
         registerWithEmail,
         resetPassword,
+        resendVerificationEmail,
+        refreshVerificationStatus,
         logout,
         saveOnboarding,
         updateProfileData,

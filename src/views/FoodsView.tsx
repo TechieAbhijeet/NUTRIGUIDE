@@ -8,6 +8,9 @@ import {
   AlertCircle,
   XCircle,
   ArrowRight,
+  HelpCircle,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FoodItem, RatingRule, SavedFoodItem, FoodType } from '../types';
@@ -52,6 +55,7 @@ export const FoodsView: React.FC<FoodsViewProps> = ({
 }) => {
   const { profile } = useAuth();
   const [selectedType, setSelectedType] = useState<CategoryFilter>('all');
+  const [showUnknownSection, setShowUnknownSection] = useState(false);
 
   const conditions = profile?.conditions || [];
   const isVegDiet = profile?.dietType === 'veg';
@@ -93,6 +97,11 @@ export const FoodsView: React.FC<FoodsViewProps> = ({
 
   const limitFoods = useMemo(
     () => filteredFoods.filter(f => foodEvalMap.get(f.id)?.overallLevel === 'limit'),
+    [filteredFoods, foodEvalMap]
+  );
+
+  const unknownFoods = useMemo(
+    () => filteredFoods.filter(f => foodEvalMap.get(f.id)?.overallLevel === 'unknown'),
     [filteredFoods, foodEvalMap]
   );
 
@@ -138,6 +147,7 @@ export const FoodsView: React.FC<FoodsViewProps> = ({
     const isSaved = !!savedMap.get(food.id);
     const isLimit = ev.overallLevel === 'limit';
     const isMod = ev.overallLevel === 'moderate';
+    const isUnknown = ev.overallLevel === 'unknown';
     const icon = getFoodIcon(food);
     const servingText = formatServingText(food.servingLabel, food.servingGrams);
 
@@ -190,6 +200,8 @@ export const FoodsView: React.FC<FoodsViewProps> = ({
                 ? 'bg-red-100 text-red-900 dark:bg-red-950/70 dark:text-red-200'
                 : isMod
                 ? 'bg-amber-100 text-amber-950 dark:bg-amber-950/70 dark:text-amber-200'
+                : isUnknown
+                ? 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200'
                 : 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950/70 dark:text-emerald-200'
             }`}
           >
@@ -197,10 +209,12 @@ export const FoodsView: React.FC<FoodsViewProps> = ({
               <XCircle className="w-3.5 h-3.5 shrink-0" />
             ) : isMod ? (
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            ) : isUnknown ? (
+              <HelpCircle className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
             ) : (
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
             )}
-            <span>{isLimit ? 'Limit' : isMod ? 'Moderate' : 'Suitable'}</span>
+            <span>{isLimit ? 'Limit' : isMod ? 'Moderate' : isUnknown ? 'Not enough data' : 'Suitable'}</span>
           </span>
           {ev.hasDraftGuidance && (
             <span className="text-[11px] font-semibold text-amber-900 dark:text-amber-300">
@@ -321,6 +335,40 @@ export const FoodsView: React.FC<FoodsViewProps> = ({
           {renderSection('Suitable - Eat Regularly', suitableFoods, 'suitable')}
           {renderSection('Moderate', moderateFoods, 'moderate')}
           {renderSection('Limit', limitFoods, 'limit')}
+
+          {/* Collapsed "Not enough data" Section at the bottom */}
+          <section className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowUnknownSection(prev => !prev)}
+              aria-expanded={showUnknownSection}
+              className="w-full min-h-[44px] flex items-center justify-between gap-2 pb-1.5 border-b border-stone-200 dark:border-stone-700 text-left"
+            >
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-stone-500 dark:text-stone-400 shrink-0" />
+                <h3 className="text-sm font-bold text-stone-700 dark:text-stone-300">
+                  Not enough data ({unknownFoods.length})
+                </h3>
+              </div>
+              {showUnknownSection ? (
+                <ChevronDown className="w-4 h-4 text-stone-500 shrink-0" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-stone-500 shrink-0" />
+              )}
+            </button>
+
+            {showUnknownSection && (
+              unknownFoods.length === 0 ? (
+                <p className="text-xs text-stone-400 italic py-2">
+                  No foods in this section.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+                  {unknownFoods.map(renderFoodCard)}
+                </div>
+              )
+            )}
+          </section>
         </div>
       )}
     </div>

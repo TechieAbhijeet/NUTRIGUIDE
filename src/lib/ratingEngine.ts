@@ -130,46 +130,54 @@ export function evaluateFood(
     return {
       overallLevel: 'favorable',
       evaluations: [],
+      missingNutrients: [],
       hasDraftGuidance: false,
     };
   }
 
   const evaluations: ConditionEvaluation[] = userConditions.map(condition => {
     const conditionRules = rules.filter(r => r.condition === condition);
-    let conditionLevel: RatingLevel = 'favorable';
+    let hasLimit = false;
+    let hasModerate = false;
     const reasons: string[] = [];
     const triggeredRules: RatingRule[] = [];
     const evaluatedRules: RatingRule[] = [];
+    const missingNutrients: string[] = [];
+    const missingRules: RatingRule[] = [];
 
     if (conditionRules.length === 0) {
       return {
         condition,
         level: 'favorable' as RatingLevel,
         reasons: ['No limits configured'],
+        missingNutrients: [],
         hasDraftGuidance: false,
       };
     }
 
     for (const rule of conditionRules) {
       const nutrientVal = getRuleNutrientValue(food, rule.nutrient, servings);
+      const nutrientLabel = formatNutrientLabel(rule.nutrient);
       if (nutrientVal === undefined) {
+        const missingName = nutrientLabel.toLowerCase();
+        if (!missingNutrients.includes(missingName)) {
+          missingNutrients.push(missingName);
+        }
+        missingRules.push(rule);
         continue;
       }
 
       evaluatedRules.push(rule);
-      const nutrientLabel = formatNutrientLabel(rule.nutrient);
       const unitSuffix = rule.unit ? rule.unit : '';
 
       if (nutrientVal >= rule.limitAbove) {
-        conditionLevel = 'limit';
+        hasLimit = true;
         triggeredRules.push(rule);
         reasons.push(
           `${nutrientLabel}: ${nutrientVal}${unitSuffix} (exceeds limit ${rule.limitAbove}${unitSuffix})`
         );
       } else if (nutrientVal >= rule.moderateAbove) {
-        if (conditionLevel !== 'limit') {
-          conditionLevel = 'moderate';
-        }
+        hasModerate = true;
         triggeredRules.push(rule);
         reasons.push(
           `${nutrientLabel}: ${nutrientVal}${unitSuffix} (moderate above ${rule.moderateAbove}${unitSuffix})`
@@ -177,12 +185,28 @@ export function evaluateFood(
       }
     }
 
+    const conditionLevel: RatingLevel = hasLimit
+      ? 'limit'
+      : hasModerate
+      ? 'moderate'
+      : missingNutrients.length > 0
+      ? 'unknown'
+      : 'favorable';
+
+    for (const missingName of missingNutrients) {
+      reasons.push(
+        `We don't have a value for ${missingName}. Ask your care team before eating this.`
+      );
+    }
+
     const hasDraftGuidance =
       triggeredRules.length > 0
         ? triggeredRules.some(r => !r.approved)
+        : conditionLevel === 'unknown'
+        ? missingRules.some(r => !r.approved)
         : evaluatedRules.some(r => !r.approved);
 
-    if (reasons.length === 0) {
+    if (conditionLevel === 'favorable' && reasons.length === 0) {
       reasons.push(
         hasDraftGuidance ? 'Meets standard draft targets' : 'Meets approved targets'
       );
@@ -192,6 +216,7 @@ export function evaluateFood(
       condition,
       level: conditionLevel,
       reasons,
+      missingNutrients,
       hasDraftGuidance,
     };
   });
@@ -201,16 +226,28 @@ export function evaluateFood(
     overallLevel = 'limit';
   } else if (evaluations.some(e => e.level === 'moderate')) {
     overallLevel = 'moderate';
+  } else if (evaluations.some(e => e.level === 'unknown')) {
+    overallLevel = 'unknown';
+  }
+
+  const allMissingNutrients: string[] = [];
+  for (const ev of evaluations) {
+    for (const m of ev.missingNutrients || []) {
+      if (!allMissingNutrients.includes(m)) {
+        allMissingNutrients.push(m);
+      }
+    }
   }
 
   const hasDraftGuidance =
     overallLevel === 'favorable'
       ? evaluations.some(e => e.hasDraftGuidance)
-      : evaluations.some(e => e.level !== 'favorable' && e.hasDraftGuidance);
+      : evaluations.some(e => e.level === overallLevel && e.hasDraftGuidance);
 
   return {
     overallLevel,
     evaluations,
+    missingNutrients: allMissingNutrients,
     hasDraftGuidance,
   };
 }
@@ -236,6 +273,8 @@ export function getPlainRatingLabel(level: RatingLevel): string {
       return 'Eat a small portion';
     case 'limit':
       return 'Better to limit';
+    case 'unknown':
+      return 'Not enough data';
   }
 }
 
@@ -246,6 +285,14 @@ export function getPlainMainReason(
 ): string {
   if (evaluation.overallLevel === 'favorable') {
     return 'Fits well with your health settings in a standard serving.';
+  }
+
+  if (evaluation.overallLevel === 'unknown') {
+    const firstMissing = evaluation.missingNutrients?.[0];
+    if (firstMissing) {
+      return `We don't have a value for ${firstMissing}. Ask your care team before eating this.`;
+    }
+    return "We don't have values for all rule nutrients. Ask your care team before eating this.";
   }
 
   const targetLevel: RatingLevel = evaluation.overallLevel === 'limit' ? 'limit' : 'moderate';
