@@ -1,0 +1,6 @@
+{
+  "name": "NutriGuide",
+  "description": "Personalized dietary guidance for diabetes, hypertension, and chronic kidney disease focused on Indian foods.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

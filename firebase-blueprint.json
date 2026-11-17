@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator identity document keyed by user UID",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile with personalized dietary health profile, conditions, and targets",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "dietType": { "type": "string", "enum": ["veg", "egg", "non-veg"] },
+        "conditions": {
+          "type": "array",
+          "description": "Active health conditions (diabetes, hypertension, ckd)"
+        },
+        "restrictions": {
+          "type": "array",
+          "description": "Specific dietary restrictions (sodium, potassium, phosphorus, added_sugar, fluid)"
+        },
+        "targets": {
+          "type": "object",
+          "description": "Daily nutrient targets (carbs, protein, sodium, potassium, fiber)"
+        },
+        "onboardingComplete": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["dietType", "conditions", "restrictions"]
+    },
+    "SavedFood": {
+      "title": "SavedFood",
+      "description": "Bookmarked food reference for quick access",
+      "type": "object",
+      "properties": {
+        "foodId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 100 },
+        "servingLabel": { "type": "string", "maxLength": 100 },
+        "savedAt": { "type": "string" }
+      },
+      "required": ["foodId", "name"]
+    },
+    "SearchHistory": {
+      "title": "SearchHistory",
+      "description": "Recent searches made by user",
+      "type": "object",
+      "properties": {
+        "query": { "type": "string", "maxLength": 150 },
+        "searchedAt": { "type": "string" }
+      },
+      "required": ["query"]
+    },
+    "DailyPlan": {
+      "title": "DailyPlan",
+      "description": "User daily meal plan organized into 4 slots: breakfast, lunch, dinner, snacks",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "maxLength": 30 },
+        "breakfast": { "type": "array" },
+        "lunch": { "type": "array" },
+        "dinner": { "type": "array" },
+        "snacks": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["date"]
+    },
+    "MealLog": {
+      "title": "MealLog",
+      "description": "Individual logged meal record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "maxLength": 30 },
+        "mealType": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snacks"] },
+        "foodId": { "type": "string", "maxLength": 128 },
+        "foodName": { "type": "string", "maxLength": 150 },
+        "quantity": { "type": "number" },
+        "loggedAt": { "type": "string" }
+      },
+      "required": ["date", "mealType", "foodId"]
+    },
+    "Food": {
+      "title": "Food",
+      "description": "Nutritional database of Indian food items with macro and micronutrients",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "enum": ["meal", "fruit", "vegetable", "grain", "pulse", "dairy", "snack", "drink"] },
+        "servingLabel": { "type": "string", "maxLength": 100 },
+        "servingGrams": { "type": "number" },
+        "kcal": { "type": "number" },
+        "carbs": { "type": "number" },
+        "sugars": { "type": "number", "description": "Nullable when unknown" },
+        "fiber": { "type": "number", "description": "Nullable when unknown" },
+        "protein": { "type": "number" },
+        "sodium": { "type": "number" },
+        "potassium": { "type": "number" },
+        "phosphorus": { "type": "number" },
+        "isVeg": { "type": "boolean" },
+        "source": { "type": "string", "maxLength": 200 },
+        "icon": { "type": "string", "maxLength": 20 },
+        "reviewedBy": { "type": "string", "maxLength": 150 },
+        "reviewedDate": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["name", "category", "servingLabel", "servingGrams", "kcal", "carbs", "protein", "sodium", "potassium", "phosphorus", "isVeg"]
+    },
+    "RatingRule": {
+      "title": "RatingRule",
+      "description": "Nutrient threshold rule for condition evaluation",
+      "type": "object",
+      "properties": {
+        "condition": { "type": "string", "enum": ["diabetes", "hypertension", "ckd"] },
+        "nutrient": { "type": "string", "maxLength": 50 },
+        "moderateAbove": { "type": "number" },
+        "limitAbove": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 20 },
+        "approved": { "type": "boolean" },
+        "disclaimer": { "type": "string", "maxLength": 300 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "approvedBy": { "type": "string", "maxLength": 150 },
+        "approvedDate": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["condition", "nutrient", "moderateAbove", "limitAbove", "unit", "approved"]
+    }
+  },
+  "firestore": {
+    "/admins/{uid}": {
+      "schema": "Admin",
+      "description": "Admin identity marker. Read-only for user UID; writes forbidden from app."
+    },
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profile, conditions, diet type, and daily targets"
+    },
+    "/users/{uid}/saved/{savedId}": {
+      "schema": "SavedFood",
+      "description": "User saved/bookmarked foods"
+    },
+    "/users/{uid}/searches/{searchId}": {
+      "schema": "SearchHistory",
+      "description": "Recent searches history"
+    },
+    "/users/{uid}/plans/{planDate}": {
+      "schema": "DailyPlan",
+      "description": "Daily 4-meal plan by date string"
+    },
+    "/users/{uid}/meals/{mealId}": {
+      "schema": "MealLog",
+      "description": "Historical logged meals"
+    },
+    "/foods/{foodId}": {
+      "schema": "Food",
+      "description": "Public Indian food nutritional entries"
+    },
+    "/ratingRules/{ruleId}": {
+      "schema": "RatingRule",
+      "description": "Draft clinical nutrient thresholds for condition evaluation"
+    }
+  }
+}
