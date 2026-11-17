@@ -33,6 +33,21 @@ interface CanIEatViewProps {
   onOpenWhatCanIEat: () => void;
 }
 
+function parseFoodAliases(food: FoodItem): string[] {
+  const raw = (food as FoodItem & Record<string, unknown>).aliases;
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map(a => String(a ?? '').trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split('|')
+      .map(a => a.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export const CanIEatView: React.FC<CanIEatViewProps> = ({
   foods,
   ratingRules,
@@ -64,12 +79,52 @@ export const CanIEatView: React.FC<CanIEatViewProps> = ({
   const matchingFoods = useMemo(() => {
     if (!trimmedQuery) return [];
     const q = trimmedQuery.toLowerCase();
-    return foods.filter(food => {
-      const nameMatch = food.name.toLowerCase().includes(q);
+
+    const matches: { food: FoodItem; rank: number; matchedAlias: string | null }[] = [];
+
+    for (const food of foods) {
+      const nameLower = food.name.toLowerCase();
+      const aliases = parseFoodAliases(food);
+
+      const nameStarts = nameLower.startsWith(q);
+      const aliasStartsMatch = aliases.find(a => a.toLowerCase().startsWith(q)) || null;
+      const nameContains = nameLower.includes(q);
+      const aliasContainsMatch = aliases.find(a => a.toLowerCase().includes(q)) || null;
       const catMatch = food.category.toLowerCase().includes(q);
       const typeMatch = (food.type || '').toLowerCase().includes(q);
-      return nameMatch || catMatch || typeMatch;
-    });
+
+      if (
+        !nameStarts &&
+        !aliasStartsMatch &&
+        !nameContains &&
+        !aliasContainsMatch &&
+        !catMatch &&
+        !typeMatch
+      ) {
+        continue;
+      }
+
+      const rank = nameStarts
+        ? 0
+        : aliasStartsMatch
+        ? 1
+        : nameContains || aliasContainsMatch
+        ? 2
+        : 3;
+
+      const matchedAlias = nameStarts
+        ? null
+        : aliasStartsMatch
+        ? aliasStartsMatch
+        : nameContains
+        ? null
+        : aliasContainsMatch;
+
+      matches.push({ food, rank, matchedAlias });
+    }
+
+    matches.sort((a, b) => a.rank - b.rank || a.food.name.localeCompare(b.food.name));
+    return matches;
   }, [foods, trimmedQuery]);
 
   const saveSearchTerm = async (term: string) => {
@@ -202,7 +257,7 @@ export const CanIEatView: React.FC<CanIEatViewProps> = ({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {matchingFoods.map(food => {
+                {matchingFoods.map(({ food, matchedAlias }) => {
                   const ev = evaluateFood(food, conditions, ratingRules);
                   const level = ev.overallLevel;
                   const overallIsLimit = level === 'limit';
@@ -220,8 +275,13 @@ export const CanIEatView: React.FC<CanIEatViewProps> = ({
                         className="w-full min-h-[48px] text-left flex items-center justify-between gap-3 active:scale-[0.99]"
                       >
                         <div className="flex-1 min-w-0 space-y-1">
-                          <h2 className="text-base font-extrabold text-stone-950 dark:text-white leading-snug">
-                            {food.name}
+                          <h2 className="text-base font-extrabold text-stone-950 dark:text-white leading-snug flex flex-wrap items-baseline gap-x-2">
+                            <span>{food.name}</span>
+                            {matchedAlias && (
+                              <span className="text-xs font-medium text-stone-600 dark:text-stone-400">
+                                ({matchedAlias})
+                              </span>
+                            )}
                           </h2>
                           <p className="text-sm text-stone-700 dark:text-stone-300">
                             Serving: {formatServingText(food.servingLabel, food.servingGrams)}
